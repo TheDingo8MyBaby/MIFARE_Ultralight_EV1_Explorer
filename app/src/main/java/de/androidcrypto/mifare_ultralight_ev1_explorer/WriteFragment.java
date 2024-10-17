@@ -33,6 +33,7 @@ import android.widget.AutoCompleteTextView;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,49 +47,33 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
-/**
- * A simple {@link Fragment} subclass.
- * Use the {@link WriteFragment#newInstance} factory method to
- * create an instance of this fragment.
- */
 public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback {
 
-    // TODO: Rename parameter arguments, choose names that match
-    // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
     private static final String TAG = "WriteFragment";
 
-    // TODO: Rename and change types of parameters
     private String mParam1;
     private String mParam2;
 
     private com.google.android.material.textfield.TextInputEditText dataToSend, resultNfcWriting;
     private SwitchMaterial addTimestampToData;
-    private AutoCompleteTextView autoCompleteTextView;
+    private AutoCompleteTextView startPageTextView, endPageTextView;
     private com.google.android.material.textfield.TextInputLayout dataToSendLayout;
-    private RadioButton rbNoAuth, rbDefaultAuth, rbCustomAuth;
+    private RadioButton rbNoAuth, rbDefaultAuth, rbCustomAuth, rbHex, rbAscii;
+    private RadioGroup rgDataFormat;
     private View loadingLayout;
     private NfcAdapter mNfcAdapter;
     private NfcA nfcA;
     private boolean isTagUltralight = false;
     private int storageSize = 0;
-    private int pageToWrite;
-    private String outputString = ""; // used for the UI output
+    private int startPage, endPage;
+    private String outputString = "";
 
     public WriteFragment() {
         // Required empty public constructor
     }
 
-    /**
-     * Use this factory method to create a new instance of
-     * this fragment using the provided parameters.
-     *
-     * @param param1 Parameter 1.
-     * @param param2 Parameter 2.
-     * @return A new instance of fragment SendFragment.
-     */
-    // TODO: Rename and change types and number of parameters
     public static WriteFragment newInstance(String param1, String param2) {
         WriteFragment fragment = new WriteFragment();
         Bundle args = new Bundle();
@@ -110,13 +95,11 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
         return inflater.inflate(R.layout.fragment_write, container, false);
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-
         dataToSend = getView().findViewById(R.id.etWriteData);
         dataToSendLayout = getView().findViewById(R.id.etWriteDataLayout);
         resultNfcWriting = getView().findViewById(R.id.etMainResult);
@@ -126,38 +109,45 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
         rbDefaultAuth = getView().findViewById(R.id.rbDefaultAuth);
         rbCustomAuth = getView().findViewById(R.id.rbCustomAuth);
         loadingLayout = getView().findViewById(R.id.loading_layout);
+        rgDataFormat = getView().findViewById(R.id.rgDataFormat);
+        rbHex = getView().findViewById(R.id.rbHex);
+        rbAscii = getView().findViewById(R.id.rbAscii);
 
-        // The minimum number of pages to write is 4 (= 16 bytes user memory)
-        // as we are writing a 16 bytes long data we do need 4 pages to write the data and
-        // therefore when writing to page 4 we will write to pages 4, 5, 6 and 7
-        String[] type = new String[]{
-                "4", "5", "6", "7", "8",
-                "9"};
+        startPageTextView = getView().findViewById(R.id.startPage);
+        endPageTextView = getView().findViewById(R.id.endPage);
+
+        String[] pages = new String[]{"4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"};
         ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(
                 getView().getContext(),
                 R.layout.drop_down_item,
-                type);
+                pages);
 
-        autoCompleteTextView = getView().findViewById(R.id.writePage);
-        autoCompleteTextView.setText(type[0]);
-        autoCompleteTextView.setAdapter(arrayAdapter);
+        startPageTextView.setText(pages[0]);
+        startPageTextView.setAdapter(arrayAdapter);
+        endPageTextView.setText(pages[0]);
+        endPageTextView.setAdapter(arrayAdapter);
 
         mNfcAdapter = NfcAdapter.getDefaultAdapter(getView().getContext());
 
-        // todo work with pages > 12 depending on tag type (12 is common minimum for all Ultralight tag types)
-        autoCompleteTextView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        startPageTextView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                Log.d(TAG, "pageToWrite: " + pageToWrite);
+                startPage = Integer.parseInt(startPageTextView.getText().toString());
+                validatePages();
+            }
+        });
+
+        endPageTextView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                endPage = Integer.parseInt(endPageTextView.getText().toString());
+                validatePages();
             }
         });
 
         addTimestampToData.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                // format YYMMDD HH:mm:SS
-                // e.g.   240829 11:39:42
-                // timestamp is 15 chars long + 1 trailing " " = 16 characters = 4 PAGES
                 if (b) {
                     dataToSendLayout.setEnabled(false);
                 } else {
@@ -168,15 +158,35 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
             }
         });
 
+        rgDataFormat.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.rbHex) {
+                dataToSendLayout.setCounterMaxLength(32);
+                setEditTextMaxLength(dataToSend, 32);
+            } else {
+                dataToSendLayout.setCounterMaxLength(16);
+                setEditTextMaxLength(dataToSend, 16);
+            }
+        });
+    }
+
+    private void validatePages() {
+        if (startPage < 4 || endPage > 15 || startPage > endPage) {
+            showMessage("Invalid start or end page.");
+        } else {
+            int numPages = endPage - startPage + 1;
+            if (rbHex.isChecked()) {
+                dataToSendLayout.setCounterMaxLength(numPages * 8);
+                setEditTextMaxLength(dataToSend, numPages * 8);
+            } else {
+                dataToSendLayout.setCounterMaxLength(numPages * 4);
+                setEditTextMaxLength(dataToSend, numPages * 4);
+            }
+        }
     }
 
     private void setEditTextMaxLength(EditText et, int maxLength) {
         et.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maxLength)});
     }
-
-    /**
-     * section for NFC
-     */
 
     @Override
     public void onTagDiscovered(Tag tag) {
@@ -194,7 +204,6 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
             resultNfcWriting.setText("");
         });
 
-        // you should have checked that this device is capable of working with Mifare Ultralight tags, otherwise you receive an exception
         nfcA = NfcA.get(tag);
 
         if (nfcA == null) {
@@ -205,7 +214,6 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
             return;
         }
 
-        //get card details
         byte[] tagId = nfcA.getTag().getId();
         int maxTransceiveLength = nfcA.getMaxTransceiveLength();
         String[] techList = nfcA.getTag().getTechList();
@@ -225,7 +233,6 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
         }
         writeToUiAppend(sb.toString());
 
-        // stop processing if not an Ultralight Family tag
         if (!isTagUltralight) {
             returnOnNotSuccess();
             return;
@@ -235,7 +242,6 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
             nfcA.connect();
 
             if (nfcA.isConnected()) {
-                // get the version
                 storageSize = identifyUltralightEv1Tag(nfcA);
                 sb = new StringBuilder();
                 if (storageSize == 0) {
@@ -261,8 +267,6 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
                     return;
                 }
 
-                // you should have checked that this device is capable of working with Mifare Ultralight tags, otherwise you receive an exception
-
                 String sendData = dataToSend.getText().toString();
                 if (addTimestampToData.isChecked()) sendData = getTimestampShort() + " ";
                 if (TextUtils.isEmpty(sendData)) {
@@ -270,14 +274,29 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
                     writeToUiFinal(resultNfcWriting);
                     return;
                 }
-                if (sendData.length() > 16) sendData = sendData.substring(0, 16);
+
+                int numPages = endPage - startPage + 1;
+                int requiredLength = rbHex.isChecked() ? numPages * 8 : numPages * 4;
+                if (sendData.length() != requiredLength) {
+                    writeToUiAppend("Invalid data length. Expected " + requiredLength + " characters.");
+                    writeToUiFinal(resultNfcWriting);
+                    return;
+                }
+
+                byte[] dtw = new byte[numPages * 4];
+                if (rbHex.isChecked()) {
+                    dtw = hexStringToByteArray(sendData);
+                } else {
+                    System.arraycopy(sendData.getBytes(StandardCharsets.UTF_8), 0, dtw, 0, sendData.getBytes(StandardCharsets.UTF_8).length);
+                }
+
+                writeToUiAppend(printData("data to write", dtw));
 
                 if (rbNoAuth.isChecked()) {
                     writeToUiAppend("No Authentication requested");
                     authSuccess = true;
                 } else if (rbDefaultAuth.isChecked()) {
                     writeToUiAppend("Authentication with Default Password requested");
-                    // authenticate with default password and pack
                     int authResult = authenticateUltralightEv1(nfcA, defaultPassword, defaultPack);
                     if (authResult == 1) {
                         writeToUiAppend("authentication with Default Password and Pack: SUCCESS");
@@ -288,7 +307,6 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
                     }
                 } else {
                     writeToUiAppend("Authentication with Custom Password requested");
-                    // authenticate with custom password and pack
                     int authResult = authenticateUltralightEv1(nfcA, customPassword, customPack);
                     if (authResult == 1) {
                         writeToUiAppend("authentication with Custom Password and Pack: SUCCESS");
@@ -305,28 +323,11 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
                     return;
                 }
 
-                // get page to write
-                String choiceString = autoCompleteTextView.getText().toString();
-                pageToWrite = Integer.parseInt(choiceString);
-
-                byte[] dtw = new byte[16];
-                System.arraycopy(sendData.getBytes(StandardCharsets.UTF_8), 0, dtw, 0, sendData.getBytes(StandardCharsets.UTF_8).length); // this is an array filled up with 0x00
-                writeToUiAppend(printData("data to write", dtw));
-                // split dtw (16 bytes long) into 4 byte arrays for page 1 to 4
-                byte[] page1 = Arrays.copyOfRange(dtw, 0, 4);
-                byte[] page2 = Arrays.copyOfRange(dtw, 4, 8);
-                byte[] page3 = Arrays.copyOfRange(dtw, 8, 12);
-                byte[] page4 = Arrays.copyOfRange(dtw, 12, 16);
-
-                // write to tag
-                success = writePageMifareUltralightEv1(nfcA, pageToWrite, page1);
-                writeToUiAppend("Tried to write data to tag on page " + pageToWrite + ", success ? : " + success);
-                success = writePageMifareUltralightEv1(nfcA, pageToWrite + 1, page2);
-                writeToUiAppend("Tried to write data to tag on page " + (pageToWrite + 1) + ", success ? : " + success);
-                success = writePageMifareUltralightEv1(nfcA, pageToWrite + 2, page3);
-                writeToUiAppend("Tried to write data to tag on page " + (pageToWrite + 2) + ", success ? : " + success);
-                success = writePageMifareUltralightEv1(nfcA, pageToWrite + 3, page4);
-                writeToUiAppend("Tried to write data to tag on page " + (pageToWrite + 3) + ", success ? : " + success);
+                for (int i = 0; i < numPages; i++) {
+                    byte[] pageData = Arrays.copyOfRange(dtw, i * 4, (i + 1) * 4);
+                    success = writePageMifareUltralightEv1(nfcA, startPage + i, pageData);
+                    writeToUiAppend("Tried to write data to tag on page " + (startPage + i) + ", success ? : " + success);
+                }
                 nfcA.close();
             }
         } catch (IOException e) {
@@ -339,7 +340,6 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
         setLoadingLayoutVisibility(false);
         doVibrate(getActivity());
         reconnect(nfcA);
-
     }
 
     private void returnOnNotSuccess() {
@@ -352,8 +352,6 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
     }
 
     private void reconnect(NfcA nfcA) {
-        // this is just an advice - if an error occurs - close the connection and reconnect the tag
-        // https://stackoverflow.com/a/37047375/8166854
         try {
             nfcA.close();
             Log.d(TAG, "Close NfcA");
@@ -368,10 +366,6 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
         }
     }
 
-    /**
-     * Sound files downloaded from Material Design Sounds
-     * https://m2.material.io/design/sound/sound-resources.html
-     */
     private void playSinglePing() {
         MediaPlayer mp = MediaPlayer.create(getContext(), R.raw.notification_decorative_02);
         mp.start();
@@ -392,17 +386,11 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
                 @Override
                 public void run() {
                     textView.setText(outputString);
-                    System.out.println(outputString); // print the data to console
+                    System.out.println(outputString);
                 }
             });
         }
     }
-
-    /**
-     * shows a progress bar as long as the reading lasts
-     *
-     * @param isVisible
-     */
 
     private void setLoadingLayoutVisibility(boolean isVisible) {
         getActivity().runOnUiThread(() -> {
@@ -416,9 +404,7 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
 
     private void showMessage(String message) {
         getActivity().runOnUiThread(() -> {
-            Toast.makeText(getContext(),
-                    message,
-                    Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
             resultNfcWriting.setText(message);
         });
     }
@@ -433,17 +419,12 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
     public void onResume() {
         super.onResume();
         if (mNfcAdapter != null) {
-
             if (!mNfcAdapter.isEnabled())
                 showWirelessSettings();
 
             Bundle options = new Bundle();
-            // Work around for some broken Nfc firmware implementations that poll the card too fast
             options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250);
 
-            // Enable ReaderMode for NfcA types of card and disable platform sounds
-            // the option NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK is NOT set
-            // to get the data of the tag after reading
             mNfcAdapter.enableReaderMode(getActivity(),
                     this,
                     NfcAdapter.FLAG_READER_NFC_A |
@@ -467,5 +448,15 @@ public class WriteFragment extends Fragment implements NfcAdapter.ReaderCallback
     @Override
     public void onDestroy() {
         super.onDestroy();
+    }
+
+    private byte[] hexStringToByteArray(String s) {
+        int len = s.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+                    + Character.digit(s.charAt(i + 1), 16));
+        }
+        return data;
     }
 }
