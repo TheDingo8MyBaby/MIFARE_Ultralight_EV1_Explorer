@@ -16,6 +16,9 @@ The tutorial to this app is available on medium.com: https://medium.com/@android
 2) You can choose to write either the HEX data or the ASCII data.
 3) You can write from Pages 4 to 15 all at once or individually.
 
+You MUST Select a **START PAGE** & an **END PAGE**.
+> Even if you want to start on Page: 4, Tap it and Select Page: 4 again.
+
 ![Updated Write UI](assets/pictures/updated_ui-write.png)
 
 -----
