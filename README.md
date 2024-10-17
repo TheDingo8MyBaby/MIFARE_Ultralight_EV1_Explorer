@@ -9,6 +9,15 @@ in Authentication, page locking, counter and other details. Using these tags wit
 
 The tutorial to this app is available on medium.com: https://medium.com/@androidcrypto/explore-a-mifare-ultralight-ev1-nfc-tag-android-java-a23d0b4b0ea5
 
+-----
+
+## Changes w/ my Fork:
+1) You can select a Start & End page for the data you wish to write.
+2) You can choose to write either the HEX data or the ASCII data.
+3) You can write from Pages 4 to 15 all at once or individually.
+
+-----
+
 ## Data Sheet
 
 The Mifare Ultralight EV1 datasheet is a good source for all questions regarding programming this tag:
