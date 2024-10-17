@@ -10,6 +10,11 @@ You MUST Select a **START PAGE** & an **END PAGE**.
 
 ![Updated Write UI](assets/pictures/updated_ui-write.png)
 
+## [Parser Available](https://thedingo8mybaby.github.io/MIFARE_Ultralight_EV1_Explorer/):
+
+I have made a basic parser that uses an Export from the app [TagInfo](https://play.google.com/store/apps/details?id=com.nxp.taginfolite&hl=en_US) 
+
+[![Web Parser:](https://i.imgur.com/EUI9rvf.png)](https://thedingo8mybaby.github.io/MIFARE_Ultralight_EV1_Explorer/)
 -----
 
 ## Description
