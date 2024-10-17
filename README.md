@@ -1,16 +1,5 @@
 # MIFARE Ultralight EV1 Explorer
 
-## Description
-
-This app reads and writes data to NXP's MIFARE Ultralight EV1 tag. It is tested with a fabric new Ultralight EV1 type.
-
-**Please do not use a MIFARE Ultralight or Ultralight C tag with this app** - these have a similar command set but are different 
-in Authentication, page locking, counter and other details. Using these tags with the app may brick your tag.
-
-The tutorial to this app is available on medium.com: https://medium.com/@androidcrypto/explore-a-mifare-ultralight-ev1-nfc-tag-android-java-a23d0b4b0ea5
-
------
-
 ## Changes w/ my Fork:
 1) You can select a Start & End page for the data you wish to write.
 2) You can choose to write either the HEX data or the ASCII data.
@@ -20,6 +9,17 @@ You MUST Select a **START PAGE** & an **END PAGE**.
 > Even if you want to start on Page: 4, Tap it and Select Page: 4 again.
 
 ![Updated Write UI](assets/pictures/updated_ui-write.png)
+
+-----
+
+## Description
+
+This app reads and writes data to NXP's MIFARE Ultralight EV1 tag. It is tested with a fabric new Ultralight EV1 type.
+
+**Please do not use a MIFARE Ultralight or Ultralight C tag with this app** - these have a similar command set but are different 
+in Authentication, page locking, counter and other details. Using these tags with the app may brick your tag.
+
+The tutorial to this app is available on medium.com: https://medium.com/@androidcrypto/explore-a-mifare-ultralight-ev1-nfc-tag-android-java-a23d0b4b0ea5
 
 -----
 
