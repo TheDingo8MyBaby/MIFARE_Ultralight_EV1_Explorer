@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dingo's MIFARE Ultralight EV1 Parser</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        h1, h2 {
+            margin: 10px 0;
+        }
+        input[type="file"], select {
+            margin: 5px 0;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        #logo {
+            margin-bottom: 20px;
+            width: 15%; /* Adjust logo size */
+        }
+        #cardTypeHeader {
+            font-size: 24px; /* Adjust font size for Card Type */
+        }
+        #parsedOutput {
+            font-size: 22px; /* 2pts smaller than Card Type */
+            background-color: #f4f4f4;
+            padding: 10px;
+            border: 1px solid #ccc;
+            display: inline-block;
+            text-align: left;
+        }
+        #copyButton {
+            margin-top: 10px;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <img id="logo" src="https://avatars.githubusercontent.com/u/140236702?v=4" alt="Logo">
+    <h1><a href="https://github.com/TheDingo8MyBaby/" target="_blank">Dingo's</a> MIFARE Ultralight EV1 Parser</h1>
+    <h2>Upload the .xml Export File from: <a href="https://play.google.com/store/apps/details?id=com.nxp.taginfolite&hl=en_US" target="_blank">NFC TagInfo by NXP</a></h2>
+    <input type="file" id="fileInput" accept=".xml">
+    <br>
+    <label for="startPage">Start Page:</label>
+    <select id="startPage">
+        <option value="" disabled selected>Select Start Page</option>
+        <option value="4">Page 4</option>
+        <option value="5">Page 5</option>
+        <option value="6">Page 6</option>
+        <option value="7">Page 7</option>
+        <option value="8">Page 8</option>
+        <option value="9">Page 9</option>
+        <option value="10">Page 10</option>
+        <option value="11">Page 11</option>
+        <option value="12">Page 12</option>
+        <option value="13">Page 13</option>
+        <option value="14">Page 14</option>
+        <option value="15">Page 15</option>
+    </select>
+    <br>
+    <label for="endPage">End Page:</label>
+    <select id="endPage">
+        <option value="" disabled selected>Select End Page</option>
+        <option value="4">Page 4</option>
+        <option value="5">Page 5</option>
+        <option value="6">Page 6</option>
+        <option value="7">Page 7</option>
+        <option value="8">Page 8</option>
+        <option value="9">Page 9</option>
+        <option value="10">Page 10</option>
+        <option value="11">Page 11</option>
+        <option value="12">Page 12</option>
+        <option value="13">Page 13</option>
+        <option value="14">Page 14</option>
+        <option value="15">Page 15</option>
+    </select>
+    <br>
+    <button onclick="parseFile()">Parse File</button>
+    <h2 id="cardTypeHeader"></h2>
+    <h2>Parsed Output:</h2>
+    <div id="parsedOutput"></div>
+    <button id="copyButton" onclick="copyToClipboard()" style="display: none;">Copy Code</button>
+
+    <script>
+        function parseFile() {
+            const fileInput = document.getElementById('fileInput');
+            const startPageSelect = document.getElementById('startPage');
+            const endPageSelect = document.getElementById('endPage');
+            const cardTypeHeader = document.getElementById('cardTypeHeader');
+            const parsedOutput = document.getElementById('parsedOutput');
+            const copyButton = document.getElementById('copyButton');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Please select a file.');
+                return;
+            }
+
+            const startPage = parseInt(startPageSelect.value);
+            const endPage = parseInt(endPageSelect.value);
+
+            if (isNaN(startPage) || isNaN(endPage) || startPage > endPage) {
+                alert('Invalid start or end page.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const content = event.target.result;
+                const { title, parsedContent } = parseXml(content, startPage, endPage);
+
+                if (title !== 'NXP Semiconductors MIFARE Ultralight EV1 (MF0UL11)') {
+                    cardTypeHeader.innerHTML = '<span class="error">Invalid Card Type. Card MUST be a MIFARE Ultralight EV1 (MF0UL11)</span>';
+                    parsedOutput.textContent = '';
+                    copyButton.style.display = 'none';
+                } else {
+                    cardTypeHeader.innerHTML = `Card Type: <b>${title}</b>`;
+                    parsedOutput.textContent = parsedContent;
+                    copyButton.style.display = 'inline-block';
+                }
+            };
+
+            reader.readAsText(file);
+        }
+
+        function parseXml(xmlContent, startPage, endPage) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
+            const title = xmlDoc.querySelector('title').textContent.trim().replace(' tag', '');
+            const blocks = xmlDoc.querySelectorAll('block[type="Ultralight"]');
+            let result = '';
+
+            blocks.forEach(block => {
+                const address = parseInt(block.querySelector('address').textContent.trim());
+                if (address >= startPage && address <= endPage) {
+                    const data = block.querySelector('data').textContent.trim().replace(/\s+/g, '');
+                    result += data;
+                }
+            });
+
+            return { title, parsedContent: result };
+        }
+
+        function copyToClipboard() {
+            const parsedOutput = document.getElementById('parsedOutput');
+            const textArea = document.createElement('textarea');
+            textArea.value = parsedOutput.textContent;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert('Code copied to clipboard!');
+        }
+    </script>
+</body>
+</html>
